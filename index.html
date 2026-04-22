@@ -8,22 +8,28 @@
   <link rel="icon" href="icon.png" />
   <meta name="theme-color" content="#2e7d32" />
   <style>
-    :root{--green:#2e7d32;--card:#fff;--light:#eef7ff}
-    *{box-sizing:border-box} body{font-family:sans-serif;margin:0;background:linear-gradient(180deg,#f7fff7,#eef7ff);padding:1rem;color:#17321c}
-    .wrap{max-width:980px;margin:0 auto} h1{text-align:center;color:var(--green)}
+    :root{--green:#2e7d32;--card:#fff;--bg:#eef7ff}
+    *{box-sizing:border-box}
+    body{font-family:sans-serif;margin:0;background:linear-gradient(180deg,#f7fff7,var(--bg));padding:1rem;color:#17321c}
+    .wrap{max-width:980px;margin:0 auto}
+    h1{text-align:center;color:var(--green);margin:.3rem 0 1rem}
     .card{background:var(--card);border-radius:16px;padding:1rem;margin:.8rem 0;box-shadow:0 8px 24px rgba(0,0,0,.08)}
     .controls{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
-    button{padding:.95rem 1.2rem;border:none;border-radius:12px;background:#4caf50;color:#fff;cursor:pointer}
+    button{padding:1rem 1.2rem;border:none;border-radius:12px;background:#4caf50;color:#fff;cursor:pointer;font-size:1rem}
     button.secondary{background:#607d8b}
     #melonIcon{width:140px;height:140px;object-fit:contain;display:block;margin:0 auto 1rem}
-    canvas{display:block;margin:1rem auto;background:#fff;border:1px solid #ccd7df;border-radius:10px;width:min(100%,700px);height:160px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem} @media(max-width:760px){.row{grid-template-columns:1fr}}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    @media(max-width:760px){.row{grid-template-columns:1fr}}
     .result{padding:1rem;border-radius:14px;background:#e8f5e9;font-weight:700;line-height:1.7}
     .metrics{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:.8rem;margin-top:1rem}
     @media(max-width:760px){.metrics{grid-template-columns:1fr}}
     .metric{background:#f7fafc;border:1px solid #e5edf3;border-radius:12px;padding:.8rem}
-    .label{font-size:.9rem;color:#5b6973}.value{font-size:1.25rem;font-weight:800}.sub{font-size:.9rem;color:#5b6973}
-    .history{text-align:left}.small{font-size:.92rem;color:#5f6d76}.mono{font-family:monospace}
+    .label{font-size:.9rem;color:#5b6973}
+    .value{font-size:1.25rem;font-weight:800}
+    .sub{font-size:.9rem;color:#5b6973}
+    .history{text-align:left}
+    .small{font-size:.92rem;color:#5f6d76}
+    .mono{font-family:monospace}
   </style>
 </head>
 <body>
@@ -37,8 +43,7 @@
       <button class="secondary" onclick="shareResult()">แชร์ผลลัพธ์</button>
     </div>
     <p id="status">สถานะ: พร้อมเริ่มวัด</p>
-    <canvas id="spectrum" width="700" height="160"></canvas>
-    <div class="small">ช่วงวิเคราะห์ <span class="mono">50–900 Hz</span> | จำนวนครั้ง <span id="tapProgress">0/3</span></div>
+    <div class="small">วิเคราะห์ช่วง <span class="mono">50–900 Hz</span> | จำนวนครั้ง <span id="tapProgress">0/3</span></div>
   </div>
 
   <div class="row">
@@ -72,28 +77,56 @@ const BRIX_MODEL = {
   D:{a: 5.934393,bQ:-0.003185,btau:-0.668988,bh: 8.998435},
   E:{a: 5.541440,bQ: 0.014941,btau:-25.386356,bh: 4.624970}
 };
+
 function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
 function firmnessProxy(Q,fvar){return clamp(-10.248089+0.00583836*Q+0.00071951*fvar,0,30);}
 function juiceProxy(tau,Q){return clamp(56.841913-3.857017*tau+0.005154*Q,30,100);}
 function hollowProbability(h){if(!isFinite(h))return 0; if(h>0.42)return 0.90; if(h>0.30)return 0.65; if(h>0.22)return 0.35; return 0.10;}
 function sweetnessLabel(brix){if(brix<7)return "หวานน้อย"; if(brix<10)return "หวานปานกลาง"; if(brix<12)return "หวาน"; return "หวานมาก";}
-function ripenessFromGroup(g){switch(g){case"E":return{label:"ดิบ",color:"#66bb6a",ami:15};case"D":return{label:"ใกล้สุก",color:"#ffee58",ami:40};case"C":return{label:"สุกพอดี",color:"#ef5350",ami:65};case"A":return{label:"สุกเกิน",color:"#9e9e9e",ami:88};case"B":return{label:"มีโพรง",color:"#8d6e63",ami:50};default:return{label:"-",color:"#cfd8dc",ami:0};}}
+function ripenessFromGroup(g){
+  switch(g){
+    case "E": return {label:"ดิบ", detail:"เนื้อยังอ่อน", color:"#66bb6a", ami:15};
+    case "D": return {label:"ใกล้สุก", detail:"เริ่มพร้อมรับประทาน", color:"#ffee58", ami:40};
+    case "C": return {label:"สุกพอดี", detail:"เหมาะรับประทาน", color:"#ef5350", ami:65};
+    case "A": return {label:"สุกเกิน", detail:"อาจเริ่มนิ่ม", color:"#9e9e9e", ami:88};
+    case "B": return {label:"มีโพรง", detail:"โครงสร้างภายในผิดปกติ", color:"#8d6e63", ami:50};
+    default: return {label:"-", detail:"-", color:"#cfd8dc", ami:0};
+  }
+}
 function classifyPre(Qp,h){if(h>0.30)return "B"; if(Qp<8)return "E"; if(Qp<15)return "D"; if(Qp<25)return "C"; return "A";}
 function classifyPost(Q,h){if(h>0.30)return "B"; if(Q<10)return "E"; if(Q<20)return "D"; if(Q<30)return "C"; return "A";}
-function brixModel(group,Q,tau,h){const m=BRIX_MODEL[group]||BRIX_MODEL.C; return clamp(m.a+m.bQ*Q+m.btau*tau+m.bh*h,3,20);}
-function movingAverage(arr,win=3){if(arr.length<=2)return arr.slice(); const out=[]; for(let i=0;i<arr.length;i++){let a=Math.max(0,i-Math.floor(win/2)),b=Math.min(arr.length,i+Math.floor(win/2)+1),s=0; for(let j=a;j<b;j++)s+=arr[j]; out.push(s/(b-a));} return out;}
-function getRMS(samples){let s=0; for(let i=0;i<samples.length;i++)s+=samples[i]*samples[i]; return Math.sqrt(s/samples.length);}
+function brixModel(group,Q,tau,h){
+  const m=BRIX_MODEL[group]||BRIX_MODEL.C;
+  let raw = m.a + m.bQ*Q + m.btau*tau + m.bh*h;
+  raw = 0.72 * raw + 1.8;
+  return clamp(raw, 4.5, 14.0);
+}
+function movingAverage(arr,win=3){
+  if(arr.length<=2)return arr.slice();
+  const out=[];
+  for(let i=0;i<arr.length;i++){
+    let a=Math.max(0,i-Math.floor(win/2)), b=Math.min(arr.length,i+Math.floor(win/2)+1), s=0;
+    for(let j=a;j<b;j++) s+=arr[j];
+    out.push(s/(b-a));
+  }
+  return out;
+}
+function getRMS(samples){let s=0; for(let i=0;i<samples.length;i++) s+=samples[i]*samples[i]; return Math.sqrt(s/samples.length);}
 
 let audioContext=null, mediaStream=null, analyser=null, freqData=null, timeData=null, rafId=null;
-const NUM_TAPS=3; let tapFeatures=[], listening=false, captureState="idle", eventFrames=[], cooldownFrames=0, noiseFloor=0.01;
+const NUM_TAPS=3;
+let tapFeatures=[], listening=false, captureState="idle", eventFrames=[], cooldownFrames=0, noiseFloor=0.01;
 
 async function setupAudio(){
   if(!audioContext) audioContext=new (window.AudioContext||window.webkitAudioContext)();
   if(!mediaStream){
-    mediaStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    mediaStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+    });
     const source=audioContext.createMediaStreamSource(mediaStream);
     analyser=audioContext.createAnalyser();
-    analyser.fftSize=4096; analyser.smoothingTimeConstant=0.15;
+    analyser.fftSize=4096;
+    analyser.smoothingTimeConstant=0.08;
     source.connect(analyser);
     freqData=new Float32Array(analyser.frequencyBinCount);
     timeData=new Float32Array(analyser.fftSize);
@@ -103,86 +136,159 @@ async function setupAudio(){
 async function startSession(){
   tapFeatures=[]; updateTapProgress(); setStatus("กำลังเตรียมไมโครโฟน...");
   document.getElementById("startBtn").disabled=true;
-  try{ await setupAudio(); await audioContext.resume(); listening=true; captureState="idle"; cooldownFrames=0; estimateNoiseFloor(25);}catch(err){console.error(err); setStatus("ไม่สามารถเข้าถึงไมโครโฟนได้"); document.getElementById("startBtn").disabled=false;}
+  try{
+    await setupAudio();
+    await audioContext.resume();
+    listening=true; captureState="idle"; cooldownFrames=0;
+    estimateNoiseFloor(10);
+  }catch(err){
+    console.error(err);
+    setStatus("ไม่สามารถเข้าถึงไมโครโฟนได้");
+    document.getElementById("startBtn").disabled=false;
+  }
 }
 function estimateNoiseFloor(framesLeft){
   if(!listening)return;
   analyser.getFloatTimeDomainData(timeData);
   const rms=getRMS(timeData);
-  noiseFloor=framesLeft===25?rms:0.9*noiseFloor+0.1*rms;
-  drawSpectrum();
+  noiseFloor=framesLeft===10?rms:0.85*noiseFloor+0.15*rms;
   if(framesLeft>0) requestAnimationFrame(()=>estimateNoiseFloor(framesLeft-1));
   else { setStatus(`พร้อมฟังเสียงเคาะ (${tapFeatures.length+1}/${NUM_TAPS})`); loop(); }
 }
 function loop(){
   if(!listening)return;
   analyser.getFloatTimeDomainData(timeData);
-  analyser.getFloatFrequencyData(freqData);
-  drawSpectrum();
   const rms=getRMS(timeData);
-  const onset=rms>Math.max(0.02, noiseFloor*4.0);
+  const onset=rms>Math.max(0.018, noiseFloor*3.0);
+
   if(cooldownFrames>0){cooldownFrames--; rafId=requestAnimationFrame(loop); return;}
-  if(captureState==="idle" && onset){captureState="capturing"; eventFrames=[]; setStatus(`ตรวจพบการเคาะครั้งที่ ${tapFeatures.length+1} ...`);}
+
+  if(captureState==="idle" && onset){
+    captureState="capturing";
+    eventFrames=[];
+    setStatus(`ตรวจพบการเคาะครั้งที่ ${tapFeatures.length+1} ...`);
+  }
+
   if(captureState==="capturing"){
+    analyser.getFloatTimeDomainData(timeData);
+    analyser.getFloatFrequencyData(freqData);
     eventFrames.push({time:Array.from(timeData), freq:Array.from(freqData)});
-    if(eventFrames.length>=35){
+    if(eventFrames.length>=18){
       const feat=extractFeaturesFromEvent(eventFrames);
-      if(feat){ tapFeatures.push(feat); updateTapProgress();
-        if(tapFeatures.length>=NUM_TAPS){listening=false; analyzeSession(); document.getElementById("startBtn").disabled=false; return;}
-        else setStatus(`สำเร็จ ${tapFeatures.length}/${NUM_TAPS} ครั้ง กรุณาเคาะอีกครั้ง`);
-      } else setStatus("การตรวจจับครั้งนี้ไม่ชัดเจน ลองเคาะใหม่");
-      captureState="idle"; eventFrames=[]; cooldownFrames=20;
+      if(feat){
+        tapFeatures.push(feat);
+        updateTapProgress();
+        if(tapFeatures.length>=NUM_TAPS){
+          listening=false;
+          analyzeSession();
+          document.getElementById("startBtn").disabled=false;
+          return;
+        } else {
+          setStatus(`สำเร็จ ${tapFeatures.length}/${NUM_TAPS} ครั้ง กรุณาเคาะอีกครั้ง`);
+        }
+      }else{
+        setStatus("การตรวจจับครั้งนี้ไม่ชัดเจน ลองเคาะใหม่");
+      }
+      captureState="idle";
+      eventFrames=[];
+      cooldownFrames=8;
     }
   }
   rafId=requestAnimationFrame(loop);
 }
+
 function extractFeaturesFromEvent(frames){
-  if(!frames||frames.length<8) return null;
+  if(!frames||frames.length<6) return null;
   const sampleRate=audioContext.sampleRate, fftSize=analyser.fftSize, binSize=sampleRate/fftSize;
-  const useFrames=frames.slice(1,Math.min(frames.length,8));
+  const useFrames=frames.slice(0, Math.min(frames.length, 6));
   const nBins=useFrames[0].freq.length;
   const avgDb=new Array(nBins).fill(0);
-  useFrames.forEach(fr=>{for(let i=0;i<nBins;i++)avgDb[i]+=fr.freq[i];});
-  for(let i=0;i<nBins;i++)avgDb[i]/=useFrames.length;
+  useFrames.forEach(fr=>{for(let i=0;i<nBins;i++) avgDb[i]+=fr.freq[i];});
+  for(let i=0;i<nBins;i++) avgDb[i]/=useFrames.length;
+
   const freqs=[], mags=[];
-  for(let i=0;i<nBins;i++){const f=i*binSize; if(f>=50&&f<=900){const mag=Math.pow(10, avgDb[i]/20); freqs.push(f); mags.push(isFinite(mag)?mag:0);}}
-  const magSum=mags.reduce((a,b)=>a+b,0); if(!isFinite(magSum)||magSum<=0) return null;
-  let peakIdx=0; for(let i=1;i<mags.length;i++) if(mags[i]>mags[peakIdx]) peakIdx=i;
+  for(let i=0;i<nBins;i++){
+    const f=i*binSize;
+    if(f>=50&&f<=900){
+      const mag=Math.pow(10, avgDb[i]/20);
+      freqs.push(f);
+      mags.push(isFinite(mag)?mag:0);
+    }
+  }
+  const magSum=mags.reduce((a,b)=>a+b,0);
+  if(!isFinite(magSum)||magSum<=0) return null;
+
+  let peakIdx=0;
+  for(let i=1;i<mags.length;i++) if(mags[i]>mags[peakIdx]) peakIdx=i;
   const fPeak=freqs[peakIdx], peak=mags[peakIdx], target=peak/Math.sqrt(2);
-  function interp(i1,i2,targetY){const x1=freqs[i1],x2=freqs[i2],y1=mags[i1],y2=mags[i2]; if(y2===y1)return x1; return x1+(targetY-y1)*(x2-x1)/(y2-y1);}
-  let l=peakIdx; while(l>0&&mags[l]>=target) l--; const f1=(l===peakIdx)?NaN:interp(l,l+1,target);
-  let r=peakIdx; while(r<mags.length-1&&mags[r]>=target) r++; const f2=(r===peakIdx||r>=mags.length)?NaN:interp(r-1,r,target);
+
+  function interp(i1,i2,targetY){
+    const x1=freqs[i1],x2=freqs[i2],y1=mags[i1],y2=mags[i2];
+    if(y2===y1) return x1;
+    return x1+(targetY-y1)*(x2-x1)/(y2-y1);
+  }
+  let l=peakIdx; while(l>0&&mags[l]>=target) l--;
+  const f1=(l===peakIdx)?NaN:interp(l,l+1,target);
+  let r=peakIdx; while(r<mags.length-1&&mags[r]>=target) r++;
+  const f2=(r===peakIdx||r>=mags.length)?NaN:interp(r-1,r,target);
   const bw=(isFinite(f1)&&isFinite(f2)&&f2>f1)?(f2-f1):NaN;
   const Q=(isFinite(bw)&&bw>0)?(fPeak/bw):NaN;
+
   let fMean=0; for(let i=0;i<freqs.length;i++) fMean+=freqs[i]*mags[i]; fMean/=magSum;
   let fVar=0; for(let i=0;i<freqs.length;i++) fVar+=mags[i]*Math.pow(freqs[i]-fMean,2); fVar/=magSum;
-  const fStd=Math.sqrt(Math.max(0,fVar)), hollow=fMean>0?(fStd/fMean):NaN;
+  const fStd=Math.sqrt(Math.max(0,fVar));
+  const hollow=fMean>0?(fStd/fMean):NaN;
+
   const env=frames.map(fr=>{let s=0; for(let i=0;i<fr.time.length;i++) s+=fr.time[i]*fr.time[i]; return Math.sqrt(s/fr.time.length);});
-  const smoothEnv=movingAverage(env,5), maxEnv=Math.max(...smoothEnv), start=Math.max(0,smoothEnv.indexOf(maxEnv));
+  const smoothEnv=movingAverage(env,3), maxEnv=Math.max(...smoothEnv), start=Math.max(0,smoothEnv.indexOf(maxEnv));
   const decay=smoothEnv.slice(start), dtFrame=1/60, xs=[], ys=[];
-  for(let i=0;i<decay.length;i++){ if(decay[i]>maxEnv*0.08){ xs.push(i*dtFrame); ys.push(Math.log(decay[i])); } }
+  for(let i=0;i<decay.length;i++){ if(decay[i]>maxEnv*0.10){ xs.push(i*dtFrame); ys.push(Math.log(decay[i])); } }
+
   let tau=NaN;
-  if(xs.length>=5){ const n=xs.length; let sx=0,sy=0,sxx=0,sxy=0; for(let i=0;i<n;i++){sx+=xs[i]; sy+=ys[i]; sxx+=xs[i]*xs[i]; sxy+=xs[i]*ys[i];} const denom=n*sxx-sx*sx; if(denom!==0){const slope=(n*sxy-sx*sy)/denom; if(slope<0) tau=-1/slope;}}
+  if(xs.length>=4){
+    const n=xs.length; let sx=0,sy=0,sxx=0,sxy=0;
+    for(let i=0;i<n;i++){sx+=xs[i]; sy+=ys[i]; sxx+=xs[i]*xs[i]; sxy+=xs[i]*ys[i];}
+    const denom=n*sxx-sx*sx;
+    if(denom!==0){
+      const slope=(n*sxy-sx*sy)/denom;
+      if(slope<0) tau=-1/slope;
+    }
+  }
   return {fPeak,Q,tau,fMean,fStd,fVar,hollow,bw};
 }
-function confidenceScore(features){const qSpread=Math.abs(features[0].Q-features[1].Q)+Math.abs(features[1].Q-features[2].Q)+Math.abs(features[0].Q-features[2].Q); return clamp(92-Math.min(35,qSpread*0.8),45,95);}
+
+function confidenceScore(features){
+  const qVals=features.map(t=>t.Q).filter(v=>isFinite(v));
+  if(qVals.length<2) return 45;
+  const qSpread=Math.max(...qVals)-Math.min(...qVals);
+  return clamp(94 - qSpread*1.5, 50, 97);
+}
+
 function analyzeSession(){
-  const avg={}; ['fPeak','Q','tau','fMean','fStd','fVar','hollow','bw'].forEach(k=>{const vals=tapFeatures.map(t=>t[k]).filter(v=>isFinite(v)); avg[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:NaN;});
+  const avg={};
+  ['fPeak','Q','tau','fMean','fStd','fVar','hollow','bw'].forEach(k=>{
+    const vals=tapFeatures.map(t=>t[k]).filter(v=>isFinite(v));
+    avg[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:NaN;
+  });
+
   let group=classifyPre(avg.Q, avg.hollow);
-  const Qcal=CAL.Q.a + CAL.Q.b * avg.Q;
-  const tauCal=CAL.tau.a + CAL.tau.b * (isFinite(avg.tau)?avg.tau:0.08);
+  const Qcal=CAL.Q.a + CAL.Q.b*avg.Q;
+  const tauCal=CAL.tau.a + CAL.tau.b*(isFinite(avg.tau)?avg.tau:0.08);
   group=classifyPost(Qcal, avg.hollow);
+
   const ripe=ripenessFromGroup(group);
   const brix=brixModel(group, Qcal, tauCal, avg.hollow);
   const firmness=firmnessProxy(Qcal, avg.fVar);
   const juice=juiceProxy(tauCal, Qcal);
   const hProb=hollowProbability(avg.hollow);
   const conf=confidenceScore(tapFeatures);
+
   const result=document.getElementById("result");
   result.style.backgroundColor=ripe.color;
-  result.innerHTML=`ความถี่หลักเฉลี่ย: ${avg.fPeak.toFixed(1)} Hz<br>กลุ่มคัดแยก: ${group}<br>ระดับ: ${ripe.label}<br>%Brix ประมาณ: ${brix.toFixed(1)} °Bx`;
-  document.getElementById("ripenessVal").innerText=ripe.label;
-  document.getElementById("amiVal").innerText=`AMI: ${ripe.ami.toFixed(0)}`;
+  result.innerHTML=`ความถี่หลักเฉลี่ย: ${avg.fPeak.toFixed(1)} Hz<br>ระดับความสุก: ${ripe.label} (${ripe.detail})<br>กลุ่มคัดแยก: ${group}<br>%Brix ประมาณ: ${brix.toFixed(1)} °Bx`;
+
+  document.getElementById("ripenessVal").innerText=`${ripe.label}`;
+  document.getElementById("amiVal").innerText=`AMI: ${ripe.ami.toFixed(0)} (${ripe.detail})`;
   document.getElementById("brixVal").innerText=`${brix.toFixed(1)} °Bx`;
   document.getElementById("sweetnessText").innerText=sweetnessLabel(brix);
   document.getElementById("firmVal").innerText=firmness.toFixed(1);
@@ -193,29 +299,55 @@ function analyzeSession(){
   document.getElementById("hollowText").innerText=hProb>0.7?"มีโพรง":hProb>0.3?"เสี่ยงโพรง":"ปกติ";
   document.getElementById("confVal").innerText=`${conf.toFixed(0)} %`;
   document.getElementById("groupVal").innerText=`กลุ่ม: ${group}`;
-  document.getElementById("featureList").innerHTML=`<li>Q_phone เฉลี่ย: ${avg.Q.toFixed(2)}</li><li>Q_calibrated: ${Qcal.toFixed(2)}</li><li>tau_phone เฉลี่ย: ${isFinite(avg.tau)?avg.tau.toFixed(3):"-"}</li><li>tau_calibrated: ${isFinite(tauCal)?tauCal.toFixed(3):"-"}</li><li>f_mean: ${avg.fMean.toFixed(1)} Hz</li><li>f_std: ${avg.fStd.toFixed(1)} Hz</li><li>f_variance: ${avg.fVar.toFixed(1)}</li><li>hollow proxy: ${avg.hollow.toFixed(3)}</li><li>bandwidth (-3 dB): ${isFinite(avg.bw)?avg.bw.toFixed(2):"-"}</li>`;
+
+  document.getElementById("featureList").innerHTML = `
+    <li>Q_phone เฉลี่ย: ${avg.Q.toFixed(2)}</li>
+    <li>Q_calibrated: ${Qcal.toFixed(2)}</li>
+    <li>tau_phone เฉลี่ย: ${isFinite(avg.tau)?avg.tau.toFixed(3):"-"}</li>
+    <li>tau_calibrated: ${isFinite(tauCal)?tauCal.toFixed(3):"-"}</li>
+    <li>f_mean: ${avg.fMean.toFixed(1)} Hz</li>
+    <li>f_std: ${avg.fStd.toFixed(1)} Hz</li>
+    <li>f_variance: ${avg.fVar.toFixed(1)}</li>
+    <li>hollow proxy: ${avg.hollow.toFixed(3)}</li>
+    <li>bandwidth (-3 dB): ${isFinite(avg.bw)?avg.bw.toFixed(2):"-"}</li>`;
+
   const msg=new SpeechSynthesisUtterance(`แตงโมระดับ ${ripe.label} ความหวานประมาณ ${brix.toFixed(1)} บริกซ์ ความเชื่อมั่น ${conf.toFixed(0)} เปอร์เซ็นต์`);
   speechSynthesis.cancel(); speechSynthesis.speak(msg);
+
   const history=JSON.parse(localStorage.getItem("history")||"[]");
-  history.unshift({time:new Date().toLocaleString(),fPeak:avg.fPeak,Q:Qcal,level:ripe.label,brix:brix,group:group});
+  history.unshift({time:new Date().toLocaleString(),fPeak:avg.fPeak,Q:Qcal,level:ripe.label,brix:brix,group:group,conf:conf});
   localStorage.setItem("history", JSON.stringify(history.slice(0,8)));
-  updateHistory(); setStatus("ตรวจวัดเสร็จแล้ว");
+  updateHistory();
+  setStatus("ตรวจวัดเสร็จแล้ว");
 }
-function drawSpectrum(){
-  if(!analyser||!freqData)return;
-  analyser.getFloatFrequencyData(freqData);
-  const canvas=document.getElementById("spectrum"), ctx=canvas.getContext("2d"), w=canvas.width, h=canvas.height;
-  ctx.clearRect(0,0,w,h); ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
-  const sampleRate=audioContext.sampleRate, fftSize=analyser.fftSize, binSize=sampleRate/fftSize;
-  const startF=50, endF=900, startI=Math.floor(startF/binSize), endI=Math.min(freqData.length-1, Math.ceil(endF/binSize)), visible=endI-startI+1, bw=w/visible;
-  ctx.beginPath();
-  for(let i=startI;i<=endI;i++){const db=clamp(freqData[i],-120,0), norm=(db+120)/120, x=(i-startI)*bw, y=h-norm*(h-10); if(i===startI)ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.strokeStyle="#43a047"; ctx.lineWidth=2; ctx.stroke();
-  ctx.fillStyle="#78909c"; ctx.font="12px sans-serif"; ctx.fillText("50 Hz",6,h-8); ctx.fillText("900 Hz",w-54,h-8);
-}
+
 function updateTapProgress(){document.getElementById("tapProgress").innerText=`${tapFeatures.length}/${NUM_TAPS}`;}
-function updateHistory(){const historyList=document.getElementById("history"), history=JSON.parse(localStorage.getItem("history")||"[]"); historyList.innerHTML=history.map(item=>`<li>${item.time}: ${item.fPeak.toFixed(1)} Hz | Q=${item.Q.toFixed(1)} | ${item.level} | ${item.brix.toFixed(1)} °Bx | กลุ่ม ${item.group}</li>`).join("");}
-function resetAll(){listening=false; if(rafId)cancelAnimationFrame(rafId); tapFeatures=[]; captureState="idle"; cooldownFrames=0; updateTapProgress(); document.getElementById("status").innerText="สถานะ: พร้อมเริ่มวัด"; document.getElementById("result").innerHTML="ยังไม่มีผลลัพธ์"; document.getElementById("featureList").innerHTML=""; ["ripenessVal","brixVal","firmVal","juiceVal","hollowVal","confVal"].forEach(id=>document.getElementById(id).innerText="-"); document.getElementById("amiVal").innerText="AMI: -"; document.getElementById("groupVal").innerText="กลุ่ม: -"; document.getElementById("sweetnessText").innerText="-"; document.getElementById("firmText").innerText="-"; document.getElementById("juiceText").innerText="-"; document.getElementById("hollowText").innerText="-"; document.getElementById("startBtn").disabled=false;}
-function shareResult(){const text=document.getElementById("result").innerText; if(navigator.share) navigator.share({title:"ผลวัดแตงโม", text}); else alert("อุปกรณ์นี้ไม่รองรับการแชร์");}
+function updateHistory(){
+  const historyList=document.getElementById("history");
+  const history=JSON.parse(localStorage.getItem("history")||"[]");
+  historyList.innerHTML=history.map(item=>`<li>${item.time}: ${item.fPeak.toFixed(1)} Hz | Q=${item.Q.toFixed(1)} | ${item.level} | ${item.brix.toFixed(1)} °Bx | ความเชื่อมั่น ${item.conf.toFixed(0)}%</li>`).join("");
+}
+function resetAll(){
+  listening=false; if(rafId) cancelAnimationFrame(rafId);
+  tapFeatures=[]; captureState="idle"; cooldownFrames=0;
+  updateTapProgress();
+  document.getElementById("status").innerText="สถานะ: พร้อมเริ่มวัด";
+  document.getElementById("result").innerHTML="ยังไม่มีผลลัพธ์";
+  document.getElementById("featureList").innerHTML="";
+  ["ripenessVal","brixVal","firmVal","juiceVal","hollowVal","confVal"].forEach(id=>document.getElementById(id).innerText="-");
+  document.getElementById("amiVal").innerText="AMI: -";
+  document.getElementById("groupVal").innerText="กลุ่ม: -";
+  document.getElementById("sweetnessText").innerText="-";
+  document.getElementById("firmText").innerText="-";
+  document.getElementById("juiceText").innerText="-";
+  document.getElementById("hollowText").innerText="-";
+  document.getElementById("startBtn").disabled=false;
+}
+function shareResult(){
+  const text=document.getElementById("result").innerText + "\nความเชื่อมั่น: " + document.getElementById("confVal").innerText;
+  if(navigator.share) navigator.share({title:"ผลวัดแตงโม", text});
+  else alert("อุปกรณ์นี้ไม่รองรับการแชร์");
+}
 function setStatus(msg){document.getElementById("status").innerText=`สถานะ: ${msg}`;}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}
 updateHistory();
