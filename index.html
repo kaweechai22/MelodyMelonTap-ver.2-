@@ -55,7 +55,7 @@
       <button class="secondary" onclick="shareResult()">แชร์ผลลัพธ์</button>
     </div>
     <p id="status">สถานะ: พร้อมเริ่มวัด</p>
-    <div class="small">วิเคราะห์ช่วง <span class="mono">100–1000 Hz</span> | จำนวนครั้ง <span id="tapProgress">0/5</span></div>
+    <div class="small">วิเคราะห์ช่วง <span class="mono">50–900 Hz</span> | จำนวนครั้ง <span id="tapProgress">0/5</span></div>
     <div id="signalBadge" class="sig sig-mid">คุณภาพสัญญาณ: รอวัด</div>
   </div>
 
@@ -194,7 +194,7 @@ function hollowLabel(hollowPercent){
 }
 
 let audioContext=null, mediaStream=null, analyser=null, freqData=null, timeData=null, rafId=null;
-const NUM_TAPS=3;
+const NUM_TAPS=5;
 let tapFeatures=[], listening=false, captureState="idle", eventFrames=[], cooldownFrames=0, noiseFloor=0.01;
 
 async function setupAudio(){
